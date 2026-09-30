@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Converta Já</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#161a2b;--mut:#6b7280;--pri:#4f46e5;--pri2:#7c3aed;--bd:#e5e7eb;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1220;--card:#1a1e33;--tx:#f1f2f8;--mut:#9aa1b8;--bd:#2a2f4a}}
+:root[data-theme="dark"]{--bg:#0f1220;--card:#1a1e33;--tx:#f1f2f8;--mut:#9aa1b8;--bd:#2a2f4a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+main{max-width:480px;margin:0 auto;padding:20px 16px 40px}
+h1{margin:8px 0 2px;font-size:28px;background:linear-gradient(90deg,var(--pri),var(--pri2));-webkit-background-clip:text;background-clip:text;color:transparent}
+p.sub{margin:0 0 20px;color:var(--mut)}
+button{font:inherit;border:0;border-radius:14px;padding:16px;width:100%;font-weight:600;font-size:17px;cursor:pointer}
+.main{background:linear-gradient(90deg,var(--pri),var(--pri2));color:#fff}
+.sec{background:var(--card);color:var(--tx);border:1px solid var(--bd);margin-top:10px}
+button:disabled{opacity:.45;cursor:not-allowed}
+#grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
+.th{position:relative;aspect-ratio:3/4;border-radius:10px;overflow:hidden;border:1px solid var(--bd);background:var(--card)}
+.th img{width:100%;height:100%;object-fit:cover}
+.th b{position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;padding:1px 7px;border-radius:9px}
+.th i{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;font-style:normal;width:22px;height:22px;border-radius:50%;text-align:center;line-height:22px;cursor:pointer}
+#msg{margin-top:12px;text-align:center;color:var(--mut);font-size:14px;min-height:20px}
+input[type=text]{width:100%;padding:14px;border-radius:12px;border:1px solid var(--bd);background:var(--card);color:var(--tx);font:inherit;margin-top:6px}
+label.lb{font-size:13px;color:var(--mut)}
+label.btn{display:block;position:relative;text-align:center;border-radius:14px;padding:16px;font-weight:600;font-size:17px;cursor:pointer;margin-top:10px;background:var(--card);color:var(--tx);border:1px solid var(--bd);overflow:hidden}
+label.btn input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}
+#ov{position:fixed;inset:0;background:#000;z-index:9;display:none;flex-direction:column}
+#ov.on{display:flex}
+#vid{flex:1;min-height:0;width:100%;object-fit:contain;background:#000}
+#ovb{display:flex;gap:10px;padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px))}
+#ovb button{flex:1}
+</style>
+</head>
+<body>
+<main>
+  <h1>Converta Já</h1>
+  <p class="sub">Tire uma foto e converta em PDF na hora.</p>
+
+  <button class="main" id="bCam">📷 Tirar foto</button>
+  <label class="btn" id="lblCam" style="display:none">📱 Usar câmera do celular<input id="cam" type="file" accept="image/*" capture="environment"></label>
+  <label class="btn">🖼️ Escolher da galeria<input id="gal" type="file" accept="image/*" multiple></label>
+
+  <div id="grid"></div>
+
+  <label class="lb" for="nome">Nome do arquivo</label>
+  <input id="nome" type="text" value="documento" autocomplete="off">
+
+  <button class="main" id="bPdf" style="margin-top:14px" disabled>Converter em PDF</button>
+  <button class="sec" id="bClr" disabled>Limpar tudo</button>
+  <div id="msg"></div>
+</main>
+
+<div id="ov"><video id="vid" playsinline autoplay muted></video><div id="ovb"><button class="sec" id="bFecha" style="margin:0">Fechar</button><button class="main" id="bCap">Capturar</button></div></div>
+
+<script>
+const imgs=[];
+const $=id=>document.getElementById(id);
+const grid=$('grid'),msg=$('msg');
+
+function render(){
+  grid.textContent='';
+  imgs.forEach((d,i)=>{
+    const t=document.createElement('div');t.className='th';
+    const im=document.createElement('img');im.src=d.url;
+    const n=document.createElement('b');n.textContent=i+1;
+    const x=document.createElement('i');x.textContent='×';
+    x.onclick=()=>{imgs.splice(i,1);render()};
+    t.append(im,n,x);grid.append(t);
+  });
+  $('bPdf').disabled=$('bClr').disabled=!imgs.length;
+  $('bPdf').textContent=imgs.length>1?'Converter '+imgs.length+' fotos em PDF':'Converter em PDF';
+  $('bCam').textContent=imgs.length?'📷 Adicionar outra foto':'📷 Tirar foto';
+}
+
+function load(file){
+  return new Promise((ok,err)=>{
+    const u=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{
+      const m=1800,s=Math.min(1,m/Math.max(im.width,im.height));
+      const c=document.createElement('canvas');
+      c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);
+      c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      URL.revokeObjectURL(u);
+      const url=c.toDataURL('image/jpeg',.85);
+      ok({url,w:c.width,h:c.height});
+    };
+    im.onerror=()=>err(new Error('img'));
+    im.src=u;
+  });
+}
+
+async function add(files){
+  msg.textContent='Processando…';
+  for(const f of files){try{imgs.push(await load(f))}catch(e){}}
+  msg.textContent='';render();
+}
+
+let stream=null;
+function stopCam(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}$('ov').classList.remove('on')}
+$('bCam').onclick=async()=>{
+  msg.textContent='';
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('sem api');
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    const v=$('vid');v.srcObject=stream;$('ov').classList.add('on');
+    v.play().catch(()=>{});
+  }catch(e){
+    stopCam();
+    $('lblCam').style.display='block';
+    msg.textContent=(e&&e.name==='NotAllowedError')
+      ?'Permissão da câmera negada. Libere nas configurações do navegador ou use o botão abaixo.'
+      :'A câmera ao vivo não está disponível aqui. Use o botão "Usar câmera do celular".';
+  }
+};
+$('bFecha').onclick=stopCam;
+$('bCap').onclick=()=>{
+  const v=$('vid');if(!v.videoWidth)return;
+  const m=1800,sc=Math.min(1,m/Math.max(v.videoWidth,v.videoHeight));
+  const c=document.createElement('canvas');
+  c.width=Math.round(v.videoWidth*sc);c.height=Math.round(v.videoHeight*sc);
+  c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+  imgs.push({url:c.toDataURL('image/jpeg',.85),w:c.width,h:c.height});
+  stopCam();render();
+};
+$('cam').onchange=e=>{add([...e.target.files]);e.target.value=''};
+$('gal').onchange=e=>{add([...e.target.files]);e.target.value=''};
+$('bClr').onclick=()=>{imgs.length=0;render();msg.textContent=''};
+
+$('bPdf').onclick=async()=>{
+  if(!window.jspdf){msg.textContent='Biblioteca de PDF não carregou. Tente de novo.';return}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,H=297,M=8;
+  imgs.forEach((d,i)=>{
+    if(i)doc.addPage();
+    const s=Math.min((W-2*M)/d.w,(H-2*M)/d.h),w=d.w*s,h=d.h*s;
+    doc.addImage(d.url,'JPEG',(W-w)/2,(H-h)/2,w,h);
+  });
+  let nome=($('nome').value.trim()||'documento').replace(/[\\\/:*?"<>|]/g,'_');
+  if(!/\.pdf$/i.test(nome))nome+='.pdf';
+  const blob=doc.output('blob');
+  try{
+    const dl=(typeof claude!=='undefined')?await claude.use('downloads'):null;
+    if(dl){await dl.save({filename:nome,data:blob})}
+    else{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;
+      document.body.appendChild(a);a.click();a.remove();
+    }
+    msg.textContent='✅ PDF pronto!';
+  }catch(e){
+    msg.textContent=e&&e.code==='declined'?'Download cancelado.':'Não foi possível salvar o PDF.';
+  }
+};
+render();
+</script>
+</body>
+</html>
